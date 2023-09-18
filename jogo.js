@@ -4,6 +4,9 @@ spriteFundo.src = "./fundo.jpg";
 const spriteNave = new Image();
 spriteNave.src = "./SNES - Strike Gunner STG - Players Ship.png";
 
+const spriteEnemy = new Image(); // Load the same image as the Nave
+spriteEnemy.src = "./SNES - Strike Gunner STG - Players Ship.png";
+
 const spriteTiro = new Image();
 spriteTiro.src = "./SNES - Strike Gunner STG - Players Ship.png"
 
@@ -11,6 +14,39 @@ const canvas = document.querySelector('canvas');
 const contexto = canvas.getContext('2d');
 
 let estadoTecla = {}
+
+class Enemy {
+    constructor(sx, sy, largura, altura, x, y) {
+        this.sx = sx;
+        this.sy = sy;
+        this.largura = largura;
+        this.altura = altura;
+        this.x = x;
+        this.y = y;
+        this.velocidadeX = 1; // Adjust the enemy's horizontal speed as needed
+        this.velocidadeY = 1; // Adjust the enemy's vertical speed as needed
+    }
+
+    desenha() {
+        contexto.drawImage(
+            spriteEnemy,
+            this.sx, this.sy,
+            this.largura, this.altura,
+            this.x, this.y,
+            this.largura, this.altura,
+        );
+    }
+
+    movimento(playerX, playerY) {
+        // Move the enemy towards the player
+        this.y += this.velocidadeY;
+
+
+        // You can add more advanced movement logic here based on your game's requirements.
+    }
+}
+
+
 
 class Nave {
     x = 160 - 51 / 2;
@@ -171,18 +207,30 @@ class Telas {
         if(tela == "JOGO") {
             this.fundo = new PlanoFundo();
             this.nave = new Nave(7, 57, 19, 27);
+            this.enemies = []; // Create an empty array for enemies
         }
     }
-    
+
+    criarInimigo() {
+        // Create enemies and add them to the array
+        const enemyX = Math.random() * (canvas.width - 50); // Adjust the range as needed
+        const enemyY = -30; // Start enemies above the screen
+        const enemy = new Enemy(0, 0, 19, 27, enemyX, enemyY);
+        this.enemies.push(enemy);
+    }
+
     desenha() {
         if(this.tela == "JOGO") {
             this.fundo.desenha();
             this.fundo.atualiza();
             this.nave.desenha();
-            
-            console.log(this.nave.tiro.length);
+
             for(let i = 0; i < this.nave.tiro.length; i++) {
                 this.nave.tiro[i].desenha();
+            }
+
+            for(let i = 0; i < this.enemies.length; i++) {
+                this.enemies[i].desenha();
             }
         }
     }
@@ -191,10 +239,47 @@ class Telas {
         if(this.tela == "JOGO") {
             this.nave.movimento(this.fundo.largura, this.fundo.altura);
             this.nave.atirar();
+
+            // Update enemy positions and logic
+            for(let i = 0; i < this.enemies.length; i++) {
+                this.enemies[i].movimento();
+
+                // Remove enemies when they go below the screen
+                if(this.enemies[i].y > canvas.height) {
+                    this.enemies.splice(i, 1);
+                    i--;
+                }
+            }
+
+            // Create new enemies at intervals
+            if (Math.random() < 0.02) {
+                this.criarInimigo();
+            }
+
+            for (let i = 0; i < this.enemies.length; i++) {
+                for (let j = 0; j < this.nave.tiro.length; j++) {
+                    const enemy = this.enemies[i];
+                    const bullet = this.nave.tiro[j];
+
+                    if (
+                        bullet.x < enemy.x + enemy.largura &&
+                        bullet.x + bullet.largura > enemy.x &&
+                        bullet.y < enemy.y + enemy.altura &&
+                        bullet.y + bullet.altura > enemy.y
+                    ) {
+                        // Collision detected, remove the enemy and the bullet
+                        this.enemies.splice(i, 1);
+                        this.nave.tiro.splice(j, 1);
+
+                        // Decrease i and j to avoid skipping elements
+                        i--;
+                        j--;
+                    }
+                }
+            }
         }
     }
 }
-
 
 telaAtiva = new Telas("JOGO");
 
@@ -207,10 +292,9 @@ window.addEventListener('keyup', (event) => {
 });
 
 function runGame() {
-    
     telaAtiva.desenha();
     telaAtiva.atualiza();
-        
+
     requestAnimationFrame(runGame);
 }
 
