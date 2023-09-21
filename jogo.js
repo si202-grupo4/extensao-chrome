@@ -103,7 +103,7 @@ class Nave {
             if(this.x > 0) {
                 this.velocidadeX -= this.aceleracao;
                 this.setSpriteNave(naveVermelha.esquerda1);
-                console.log(this.velocidadeX)    
+                console.log(this.velocidadeX)
                 if(this.velocidadeX < -5) {
                     this.setSpriteNave(naveVermelha.esquerda2);
                 }
@@ -111,10 +111,11 @@ class Nave {
                 this.velocidadeX = 0;
             }
         } 
-
+        
         if(estadoTecla["w"] || estadoTecla["W"]) {
             if(this.y > 0) {
                 this.velocidadeY -= this.aceleracao;
+                console.log(this.velocidadeY)
             } else {
                 this.velocidadeY = 0;
             }
