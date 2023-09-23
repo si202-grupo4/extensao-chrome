@@ -7,11 +7,17 @@ spriteNave.src = "./SNES - Strike Gunner STG - Players Ship.png";
 const spriteTiro = new Image();
 spriteTiro.src = "./tiro_nave.png"
 
+const spriteTiroEspecial = new Image();
+spriteTiroEspecial.src = "./SNES - Strike Gunner STG - Weapon Icons.png";
+
 const spriteEnemies = new Image();
 spriteEnemies.src = "./SNES - Strike Gunner STG - Enemy Air Force.png";
 
-const spriteExplosaoInimigo = new Image();
-spriteExplosaoInimigo.src = "./explosao_inimigos.png";
+const spriteExplosao = new Image();
+spriteExplosao.src = "./explosao_inimigos.png";
+
+const spriteExplosaoNuclear = new Image();
+spriteExplosaoNuclear.src = "./explosao_nuclear.png";
 
 const canvas = document.querySelector('canvas');
 const contexto = canvas.getContext('2d');
@@ -105,6 +111,15 @@ const explosaoInimigo = {
     }
 }
 
+const bombaNuclear = {
+    sprite: {
+        sx: 95,
+        sy: 252,
+        largura: 11,
+        altura: 27
+    }
+}
+
 function gerarNumeroAleatorioInclusivo(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -142,15 +157,17 @@ function colisaoAtingeInimigo(x, y, largura, altura, chave) {
 
 class Nave {
     vida = 1;
-    spriteAtual = spriteNave;
+    sprite = spriteNave;
     x = 200 - 29 / 2;
     y = 410;
     aceleracao = 0.5;
     velocidadeX = 0;
     velocidadeY = 0;
     velocidadeMax = 6;
-    intervaloTiro = 500; //Em ms;
+    intervaloTiro = 100; //Em ms
+    intervaloTiroEspecial = 1000; //Em ms
     numeroTiros = 0;
+    quantidadeTiroEspecial = 3;
 
     constructor(sx, sy, largura, altura) {
         this.sx = sx;
@@ -158,6 +175,7 @@ class Nave {
         this.largura = largura;
         this.altura = altura;
         this.tempoUltimoTiro = 0;
+        this.tempoUltimoTiroEspecial = 0;
         this.destruido = new Explosao();
     }
     
@@ -170,7 +188,7 @@ class Nave {
 
     desenha() {
         contexto.drawImage(
-            this.spriteAtual,
+            this.sprite,
             this.sx, this.sy,
             this.largura, this.altura,
             this.x, this.y,
@@ -284,8 +302,24 @@ class Nave {
         }
     }
 
+    atirarTiroEspecial() {
+        if(this.quantidadeTiroEspecial > 0) {
+            if((estadoTecla["e"] || estadoTecla["E"]) && Date.now() - this.tempoUltimoTiroEspecial > this.intervaloTiroEspecial) {
+                const sx = bombaNuclear.sprite.sx;
+                const sy = bombaNuclear.sprite.sy;
+                const largura = bombaNuclear.sprite.largura;
+                const altura = bombaNuclear.sprite.altura;
+                this.tiroEspecial = new PoderEspecialNave(sx, sy, largura, altura, (this.x + this.largura / 2) - 7, this.y);
+                this.tempoUltimoTiroEspecial = Date.now();
+                this.quantidadeTiroEspecial -= 1;
+            }
+        }
+        if(this.tiroEspecial instanceof PoderEspecialNave) {
+            this.tiroEspecial.movimento();
+        }
+    }
+
     explode() {
-        this.spriteAtual = spriteExplosaoInimigo;
         this.destruido.explodiu(this);
     }
 }
@@ -336,19 +370,93 @@ class TiroNave {
     }
 }
 
-class HelicopteroCinzaEnemie {
+class PoderEspecialNave {
+    sprite = spriteTiroEspecial
+    velocidadeMaxTiro = 4.5;
+    velocidadeTiro = 1;
+    aceleracaoTiro = 0.05;
+    desaceleracaoTiro = 0.5;
+    atingiuVelocidadeMax = false;
+    atingiuInimigo = false;
+
+    constructor(sx, sy, largura, altura, x, y) {
+        this.sx = sx;
+        this.sy = sy;
+        this.largura = largura;
+        this.altura = altura;
+        this.x = x;
+        this.y = y;
+        this.explosaoNuclear = new Explosao();
+    }
+
+    desenha() {
+        contexto.drawImage(
+            this.sprite,
+            this.sx, this.sy,
+            this.largura, this.altura,
+            this.x, this.y,
+            this.largura, this.altura,
+        );
+    }
+    
+    movimento() {
+        this.atingeInimigo();
+
+        if(this.velocidadeTiro <= 0) {
+            // console.log("ola")
+            this.explosaoNuclear.explodiu(this);
+        } else {
+            if(this.atingiuVelocidadeMax) {
+                if(this.velocidadeTiro > 0) {
+                    this.velocidadeTiro -= this.desaceleracaoTiro;
+                } else {
+                    this.velocidadeTiro = 0;
+                }
+            } else {
+                this.velocidadeTiro += this.aceleracaoTiro;
+                if(this.velocidadeTiro >= this.velocidadeMaxTiro) {
+                    this.atingiuVelocidadeMax = true;
+                }
+            }
+            this.y -= this.velocidadeTiro;
+        }
+    }
+
+    atingeInimigo() {
+        for (const chave in inimigos) {
+            if (inimigos[chave].vida > 0) {
+                if(this.x < inimigos[chave].x + inimigos[chave].largura && 
+                    this.x + this.largura > inimigos[chave].x &&
+                    this.y < inimigos[chave].y + inimigos[chave].altura &&
+                    this.y + this.altura > inimigos[chave].y
+                ) {
+                    inimigos[chave].vida = 0;
+                    this.velocidadeTiro = 0;
+                }
+            }
+        }
+    }
+    
+}
+
+class HelicopteroCinzaInimigo {
     vida = 1;
-    spriteAtual = spriteEnemies;
+    sprite = spriteEnemies;
     taxaAtualização = 2;
     frameMovimentoAtual = 0;
     spriteMovimentos = [
         {sx: 149, sy: 10, largura: 53,altura: 53},
         {sx: 149, sy: 80, largura: 53,altura: 53}
     ];
+    angle = 0;  // Ângulo inicial
+
 
     constructor(x, y, numeroInimigo) {
         this.x = x;
         this.y = y;
+        this.centerX = x;
+        this.centerY = y;
+        this.radius = gerarNumeroAleatorioInclusivo(100, 200);
         this.numeroInimigo = numeroInimigo;
         this.destruido = new Explosao();
     }
@@ -369,7 +477,7 @@ class HelicopteroCinzaEnemie {
 
     desenha() {
         contexto.drawImage(
-            this.spriteAtual,
+            this.sprite,
             this.sx, this.sy,
             this.largura, this.altura,
             this.x, this.y,
@@ -382,17 +490,50 @@ class HelicopteroCinzaEnemie {
             this.explode();
         } else {
             this.animacao();
-            this.y += 4;
+
+            if(this.centerX > 0) {
+                this.x = this.centerX + this.radius * Math.cos(this.angle);
+                this.y = this.centerY + this.radius * Math.sin(this.angle);
+                this.angle -= 0.01;
+            } else {
+                this.x = this.centerX - this.radius * Math.cos(this.angle);
+                this.y = this.centerY - this.radius * Math.sin(this.angle);
+                this.angle += 0.01;
+            }
         }
     }
 
     explode() {
-        this.spriteAtual = spriteExplosaoInimigo;
         this.destruido.explodiu(this);
     }
 }
 
 class Explosao {
+    spriteExplosaoNuclear = [
+        // { sx: 55, sy: 53, largura: 18, altura: 18 },
+        { sx: 181, sy: 51, largura: 22, altura: 22 },
+        // { sx: 303, sy: 46, largura: 33, altura: 33 },
+        { sx: 422, sy: 36, largura: 49, altura: 50 },
+        // { sx: 547, sy: 34, largura: 58, altura: 55 },
+        { sx: 28, sy: 155, largura: 73, altura: 69 },
+        // { sx: 150, sy: 149, largura: 82, altura: 81 },
+        { sx: 277, sy: 146, largura: 86, altura: 89 },
+        // { sx: 407, sy: 148, largura: 82, altura: 83 },
+        { sx: 533, sy: 148, largura: 85, altura: 85 },
+        // { sx: 16, sy: 269, largura: 97, altura: 96 },
+        { sx: 142, sy: 267, largura: 99, altura: 100 },
+        // { sx: 266, sy: 264, largura: 107, altura: 107 },
+        { sx: 266, sy: 264, largura: 107, altura: 107 },
+        // { sx: 266, sy: 264, largura: 107, altura: 107 },
+        { sx: 266, sy: 264, largura: 107, altura: 107 },
+        // { sx: 266, sy: 264, largura: 107, altura: 107 },
+        { sx: 386, sy: 256, largura: 121, altura: 120 },
+        // { sx: 512, sy: 256, largura: 127, altura: 125 },
+        { sx: 0, sy: 384, largura: 127, altura: 126 },
+        // { sx: 127, sy: 384, largura: 129, altura: 127 },
+        { sx: 254, sy: 384, largura: 130, altura: 128 },
+        // { sx: 0, sy: 0, largura: 0, altura: 0 }
+    ];
     spriteExplosoes = [
         { sx: 13, sy: 14, largura: 15, altura: 15 },
         { sx: 46, sy: 8, largura: 27, altura: 23 },
@@ -402,26 +543,38 @@ class Explosao {
         { sx: 2, sy: 43, largura: 37, altura: 35 },
         { sx: 44, sy: 45, largura: 34, altura: 32 }
     ];
-    tempo_explosao = 50;
+    tempoExplosao = 50;
     ultimaExplosao = 0;
     escolherExplosao = 0;
+    xReferencia = [];
 
     explodiu(instancia) {
-        if(Date.now() - this.ultimaExplosao > this.tempo_explosao) {                    
-            if(this.escolherExplosao < this.spriteExplosoes.length) {
-                console.log(this.escolherExplosao);
-                instancia.sx = this.spriteExplosoes[this.escolherExplosao].sx;
-                instancia.sy = this.spriteExplosoes[this.escolherExplosao].sy;
-                instancia.largura = this.spriteExplosoes[this.escolherExplosao].largura;
-                instancia.altura = this.spriteExplosoes[this.escolherExplosao].altura;
+        instancia.sprite = spriteExplosao;
+        let spriteExplosaoInfo = this.spriteExplosoes;
+        if(instancia instanceof PoderEspecialNave) {
+            instancia.sprite = spriteExplosaoNuclear;
+            spriteExplosaoInfo = this.spriteExplosaoNuclear;
+        }
+
+        if(Date.now() - this.ultimaExplosao > this.tempoExplosao) {                    
+            if(this.escolherExplosao < spriteExplosaoInfo.length) {
+                instancia.sx = spriteExplosaoInfo[this.escolherExplosao].sx;
+                instancia.sy = spriteExplosaoInfo[this.escolherExplosao].sy;
+                instancia.largura = spriteExplosaoInfo[this.escolherExplosao].largura;
+                instancia.altura = spriteExplosaoInfo[this.escolherExplosao].altura;
+                if(instancia instanceof PoderEspecialNave) {
+                    this.tempoExplosao = 10;
+                    this.xReferencia.push(instancia.x);
+                    instancia.x = this.xReferencia[0] - spriteExplosaoInfo[this.escolherExplosao].largura / 2;
+                }
                 this.escolherExplosao += 1;
                 this.ultimaExplosao = Date.now();
             } else {
                 if(instancia instanceof Nave) {
-                    console.log(this.escolherExplosao);
                     players.shift();
-                    console.log("ola");
-                } else if (instancia instanceof HelicopteroCinzaEnemie) {
+                } else if(instancia instanceof PoderEspecialNave) {
+                    delete players[0].tiroEspecial;
+                } else if(instancia instanceof HelicopteroCinzaInimigo) {
                     delete inimigos[instancia.numeroInimigo];
                 }
             }
@@ -469,27 +622,31 @@ class Telas {
         if(this.tela == "JOGO") {
             this.fundo.desenha();
             this.fundo.atualiza();
-
+            
             for(let i = 0; i < players.length; i++) {
                 players[i].desenha();
+                if(players[i].tiroEspecial instanceof PoderEspecialNave) {
+                    players[i].tiroEspecial.desenha();
+                }
             }            
-
+            
             for(const chave in tiros) {
                 tiros[chave].desenha();
             }
-            
+
             for(const chave in inimigos) {
                 inimigos[chave].desenha();
             }
         }
     }
-
+    
     atualiza() {
         if(this.tela == "JOGO") {
             if(players.length > 0) {
                 for(let i = 0; i < players.length; i++) {
                     players[i].movimento(this.fundo.largura, this.fundo.altura);
                     players[i].atirar();
+                    players[i].atirarTiroEspecial();
                 }
             } else {
                 console.log("GAME OVER");
@@ -516,11 +673,13 @@ function geradorInimigos() {
     const tempoInimigo = 10;
 
     if(time % tempoInimigo == 0) {
-        const xAleatorio = gerarNumeroAleatorioInclusivo(53, 347);
-        const inimigo = new HelicopteroCinzaEnemie(xAleatorio, -10, numeroInimigo);
+        const xAleatorio = [-10, canvas.width];
+        const escolherXAleatorio = gerarNumeroAleatorioInclusivo(0, 1);
+        const yAleatorio = gerarNumeroAleatorioInclusivo(-10, canvas.height / 2);
+        console.log(xAleatorio[escolherXAleatorio], yAleatorio);
+        const inimigo = new HelicopteroCinzaInimigo(xAleatorio[escolherXAleatorio], yAleatorio, numeroInimigo);
         inimigos[numeroInimigo] = inimigo;
         numeroInimigo += 1;
-        console.log("novo inimigo adicionado");
     }
 }
 
@@ -529,8 +688,9 @@ function runGame() {
     
     telaAtiva.desenha();
     telaAtiva.atualiza();
-        
+    
     time += 1;
+
     requestAnimationFrame(runGame);
 }
 
